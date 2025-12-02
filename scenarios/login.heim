@@ -1,0 +1,5 @@
+Buka aplikasi "com.example.android"
+Tunggu sampai muncul teks "Selamat Datang"
+Ketuk tombol "Masuk"
+Ketik "qa_user" pada kolom "Username"
+Pastikan muncul teks "Dashboard"
