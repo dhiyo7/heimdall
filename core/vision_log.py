@@ -1,6 +1,8 @@
 import subprocess
 import threading
 from collections import deque
+import re
+from urllib.parse import urlparse
 
 class VisionLog:
     """
@@ -25,22 +27,40 @@ class VisionLog:
         """
         The internal method that runs in a separate thread to monitor logcat.
         """
-        # Clear previous logs before starting
+        # Clear previous logs
         subprocess.run(["adb", "logcat", "-c"], check=False)
         
-        # Start a new logcat process
         process = subprocess.Popen(["adb", "logcat"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         
+        # Regex for request and response lines
+        req_pattern = re.compile(r"--> (GET|POST|PUT|DELETE) (https://[^ ]+)")
+        res_pattern = re.compile(r"<-- (\d{3})")
+
+        temp_request = None
+
         while self.is_running and not process.poll():
             line = process.stdout.readline()
             if not line:
                 continue
 
-            # If keywords are specified, filter lines; otherwise, capture all.
-            if not self.keywords or any(keyword in line for keyword in self.keywords):
-                self.log_buffer.append(line.strip())
+            if "OkHttp" not in line:
+                continue
 
-        process.terminate() # Ensure the process is killed on exit
+            req_match = req_pattern.search(line)
+            if req_match:
+                method, url = req_match.groups()
+                path = urlparse(url).path
+                temp_request = {"method": method, "endpoint": path}
+                continue
+
+            res_match = res_pattern.search(line)
+            if res_match and temp_request:
+                status_code = res_match.group(1)
+                temp_request["status_code"] = status_code
+                self.log_buffer.append(temp_request)
+                temp_request = None
+
+        process.terminate()
 
     def start(self):
         """
@@ -68,16 +88,11 @@ class VisionLog:
             self._log_thread.join(timeout=5) # Wait for the thread to finish
         print("VisionLog stopped.")
 
-    def get_logs(self, last_n_lines=3) -> list:
+    def get_logs(self, last_n_lines=5) -> list:
         """
-        Retrieves the last N lines from the log buffer.
-
-        Args:
-            last_n_lines (int): The number of recent lines to retrieve.
-
-        Returns:
-            list: A list of the last N captured log lines.
+        Retrieves the last N log entries from the buffer.
         """
+        # Returns a list of dictionaries
         return list(self.log_buffer)[-last_n_lines:]
 
     def clear(self):

@@ -1,5 +1,7 @@
 import re
-from uiautomator2 import UiObjectNotFoundError
+import os
+import time
+from uiautomator2.exceptions import UiObjectNotFoundError
 from heimdall.core.driver import HeimdallDriver
 from heimdall.core.vision_log import VisionLog
 from heimdall.reporters.saga_writer import SagaWriter
@@ -12,7 +14,7 @@ class HeimdallParser:
     Parses .heim files and executes commands using the HeimdallDriver.
     """
 
-    def __init__(self, driver: HeimdallDriver, logger: VisionLog, reporter: SagaWriter, state: StateManager, map_builder: MapBuilder):
+    def __init__(self, driver: HeimdallDriver, logger: VisionLog, reporter: SagaWriter, state: StateManager, map_builder: MapBuilder, screenshots_dir: str):
         """
         Initializes the parser with a driver, logger, reporter, state manager, and map builder instance.
 
@@ -22,12 +24,14 @@ class HeimdallParser:
             reporter (SagaWriter): The reporter for generating the Saga document.
             state (StateManager): The manager for tracking application state.
             map_builder (MapBuilder): The builder for generating the flowchart.
+            screenshots_dir (str): The directory to save screenshots.
         """
         self.driver = driver
         self.logger = logger
         self.reporter = reporter
         self.state = state
         self.map_builder = map_builder
+        self.screenshots_dir = screenshots_dir
 
     def parse_file(self, filepath: str):
         """
@@ -37,19 +41,33 @@ class HeimdallParser:
             filepath (str): The path to the .heim file.
         """
         print(f"--- Starting scenario: {filepath} ---")
+        step_counter = 1
         with open(filepath, 'r', encoding='utf-8') as f:
             for line_num, line in enumerate(f, 1):
                 line = line.strip()
-                if not line or line.startswith('#'):
+                if not line:
                     continue
+
+                # Check for feature comment
+                if line.startswith('# FEATURE:') or line.startswith('# FITUR:'):
+                    feature_name = line.split(':', 1)[1].strip()
+                    self.map_builder.set_feature(feature_name)
+                    print(f"\n--- Entering Feature: {feature_name} ---")
+                    continue
+
+                if line.startswith('#'): # Skip other comments
+                    continue
+
+                # Add a delay to allow the UI to settle from the previous action
+                time.sleep(1.5)
                 
-                print(f"\n[Step {line_num}]> {line}")
+                print(f"\n[Step {step_counter}]> {line}")
                 status = "Success"
                 from_activity = self.state.last_activity or "Start"
 
                 try:
                     # 1. Capture context BEFORE the action
-                    context_data = self.capture_context(line_num)
+                    context_data = self.capture_context(step_counter)
                     
                     # 2. Execute the command
                     self.execute_command(line)
@@ -68,7 +86,7 @@ class HeimdallParser:
                     # 4. Add step to Saga report
                     self.reporter.add_step(
                         step_command=line,
-                        step_number=line_num,
+                        step_number=step_counter,
                         screenshot_path=context_data["screenshot"],
                         context_data=context_data
                     )
@@ -79,46 +97,36 @@ class HeimdallParser:
                         to_activity=to_activity,
                         status=status
                     )
+                    step_counter += 1
 
         print(f"--- Scenario finished: {filepath} ---")
 
     def capture_context(self, step_number: int) -> dict:
         """
-        Captures the state (screenshot, activity, logs) before an action.
-        Returns a dictionary containing the captured data.
+        Captures the current state (screenshot, activity, logs) for reporting.
+
+        Args:
+            step_number (int): The current step number, used for the screenshot filename.
+
+        Returns:
+            dict: A dictionary containing the screenshot path, activity name, and recent logs.
         """
-        print("  [Context] Capturing state...")
-        context = {"activity": "N/A", "logs": [], "screenshot": "N/A"}
+        # 1. Take Screenshot
+        screenshot_path = os.path.join(self.screenshots_dir, f"step_{step_number}.png")
+        self.driver.take_screenshot(screenshot_path)
 
-        # Get current activity and update state
-        try:
-            activity_name = self.driver.get_current_activity()
-            context["activity"] = activity_name
-            self.state.update_activity(activity_name)
-            print(f"    - Activity: {context['activity']}")
-        except Exception as e:
-            print(f"    - Could not get activity: {e}")
+        # 2. Get Current Activity
+        activity_name = self.driver.get_current_activity()
+        self.state.update_activity(activity_name)
 
-        # Get recent logs
-        context["logs"] = self.logger.get_logs(last_n_lines=3)
-        if context["logs"]:
-            print("    - Recent Logs:")
-            for log_line in context["logs"]:
-                print(f"      {log_line}")
-        
-        # Define a consistent place for screenshots
-        screenshot_dir = self.reporter.output_dir
-        screenshot_path = f"{screenshot_dir}/step_{step_number}.png"
-        context["screenshot"] = screenshot_path
+        # 3. Get Recent Logs (now a list of dicts)
+        logs = self.logger.get_logs()
 
-        # Take screenshot
-        try:
-            self.driver.take_screenshot(screenshot_path)
-            print(f"    - Screenshot saved to {screenshot_path}")
-        except Exception as e:
-            print(f"    - Could not take screenshot: {e}")
-        
-        return context
+        return {
+            "screenshot": screenshot_path,
+            "activity": activity_name,
+            "logs": logs
+        }
 
 
     def execute_command(self, command: str):
@@ -159,15 +167,7 @@ class HeimdallParser:
             text_to_type = args_in_quotes[0]
             label = args_in_quotes[1]
             print(f"Action: Typing '{text_to_type}' into field associated with '{label}'")
-            try:
-                # Per requirement, try spatial search first for input fields
-                element = self.driver.find_input_by_label(label)
-                element.set_text(text_to_type)
-            except (UiObjectNotFoundError, IndexError):
-                print(f"Info: Spatial search failed. Falling back to robust search for '{label}'.")
-                # Fallback to general robust search
-                element = self.driver.find_element_robust(label)
-                element.set_text(text_to_type)
+            self.driver.input_text_on_field(text_to_type, label)
 
         elif normalized_command.startswith('pastikan muncul'):
             if not args_in_quotes:

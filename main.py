@@ -27,11 +27,17 @@ def main():
         print(f"Error: Scenario file not found at '{args.scenario_file}'")
         return
 
-    # Initialize Core Components
+    # --- Dynamic Directory Setup ---
     scenario_name = os.path.splitext(os.path.basename(args.scenario_file))[0]
+    output_dir = os.path.join("reports", scenario_name)
+    screenshots_dir = os.path.join(output_dir, "screenshots")
+    os.makedirs(screenshots_dir, exist_ok=True)
+    print(f"Reports will be saved in: {output_dir}")
+
+    # --- Initialize Core Components ---
     vision_logger = VisionLog(keywords=["HTTP", "OkHttp", "Retrofit"])
-    saga_reporter = SagaWriter(scenario_name)
-    map_builder = MapBuilder(scenario_name)
+    saga_reporter = SagaWriter(scenario_name, output_dir=output_dir)
+    map_builder = MapBuilder(scenario_name, output_dir=output_dir)
     state_manager = StateManager()
 
     try:
@@ -49,7 +55,8 @@ def main():
             logger=vision_logger,
             reporter=saga_reporter,
             state=state_manager,
-            map_builder=map_builder
+            map_builder=map_builder,
+            screenshots_dir=screenshots_dir
         )
 
         # Execute the scenario

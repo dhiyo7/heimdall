@@ -1,28 +1,41 @@
 from docx import Document
 from docx.shared import Inches, Pt
 import os
+import json
+import re
+
+def _format_json_log(log_line: str) -> str:
+    """Extracts and formats a JSON string from a log line."""
+    # Regex to find a JSON object (starts with { or [)
+    match = re.search(r'[{\[].*' , log_line)
+    if not match:
+        return log_line # Return original if no JSON is found
+
+    json_str = match.group(0)
+    try:
+        # Load and re-dump with indentation
+        parsed_json = json.loads(json_str)
+        return json.dumps(parsed_json, indent=4)
+    except json.JSONDecodeError:
+        return json_str # Return the raw string if parsing fails
 
 class SagaWriter:
     """
-    Generates a narrative Word document report (The Saga) for a test scenario.
+    Generates a narrative .docx report of a test scenario.
     """
-
-    def __init__(self, scenario_name: str, output_dir="reports"):
+    def __init__(self, scenario_name: str, output_dir: str):
         """
-        Initializes the report generator.
+        Initializes the SagaWriter and creates the document.
 
         Args:
-            scenario_name (str): The name of the test scenario, used for the report title.
+            scenario_name (str): The name of the test scenario.
             output_dir (str): The directory where the report will be saved.
         """
         self.scenario_name = scenario_name
-        self.output_dir = os.path.join(os.getcwd(), output_dir) # Use absolute path
-        self.document = Document()
-        self.document.add_heading(f"Heimdall Saga: {self.scenario_name}", level=0)
-        
-        # Create output directory if it doesn't exist
-        if not os.path.exists(self.output_dir):
-            os.makedirs(self.output_dir)
+        self.output_dir = output_dir
+        self.doc = Document()
+        self.doc.add_heading(f"Heimdall Saga: {scenario_name}", level=0)
+        self.doc.add_paragraph(f"This document details the execution of the '{scenario_name}' scenario.")
 
     def add_step(self, step_command: str, step_number: int, screenshot_path: str, context_data: dict):
         """
@@ -34,10 +47,10 @@ class SagaWriter:
             screenshot_path (str): Path to the screenshot image for this step.
             context_data (dict): A dictionary containing context like 'activity' and 'logs'.
         """
-        self.document.add_heading(f"Step {step_number}: {step_command}", level=2)
+        self.doc.add_heading(f"Step {step_number}: {step_command}", level=2)
 
         # Create a two-column table
-        table = self.document.add_table(rows=1, cols=2)
+        table = self.doc.add_table(rows=1, cols=2)
         table.autofit = False
         table.columns[0].width = Inches(3.5)
         table.columns[1].width = Inches(4.0)
@@ -69,32 +82,40 @@ class SagaWriter:
         activity = context_data.get('activity', 'N/A')
         p_right.add_run(f"{activity}\n\n")
 
-        # Add Logs
-        p_right.add_run('API Log Status:\n').bold = True
-        font = p_right.runs[-1].font
-        font.size = Pt(11)
+        # Add Logs in a table
         logs = context_data.get('logs', [])
         if logs:
-            for log_line in logs:
-                log_run = p_right.add_run(f"  {log_line}\n")
-                log_run.font.size = Pt(8)
+            p_right.add_run('API Log Summary:\n').bold = True
+            log_table = self.doc.add_table(rows=1, cols=3, style='Table Grid')
+            log_table.autofit = True
+            hdr_cells = log_table.rows[0].cells
+            hdr_cells[0].text = 'Method'
+            hdr_cells[1].text = 'Endpoint'
+            hdr_cells[2].text = 'Status'
+
+            for log_entry in logs:
+                row_cells = log_table.add_row().cells
+                row_cells[0].text = log_entry.get('method', 'N/A')
+                row_cells[1].text = log_entry.get('endpoint', 'N/A')
+                
+                status = str(log_entry.get('status_code', 'N/A'))
+                if status.startswith('2'):
+                    status_icon = '✅'
+                elif status.startswith(('4', '5')):
+                    status_icon = '❌'
+                else:
+                    status_icon = ''
+                row_cells[2].text = f'{status_icon} {status}'
         else:
-            p_right.add_run("  No relevant logs captured.\n")
+            p_right.add_run("No relevant logs captured.\n")
 
-        self.document.add_paragraph() # Add some space after the table
+        self.doc.add_paragraph() # Add some space after the table
 
-    def save(self, filename=None):
+    def save(self):
         """
-        Saves the Word document.
-
-        Args:
-            filename (str, optional): The name of the output file. 
-                                      If not provided, a default is generated.
+        Saves the final Word document.
         """
-        if filename is None:
-            safe_scenario_name = "".join(c for c in self.scenario_name if c.isalnum() or c in (' ', '_')).rstrip()
-            filename = f"Heimdall_Saga_{safe_scenario_name}.docx"
-        
-        save_path = os.path.join(self.output_dir, filename)
-        self.document.save(save_path)
-        print(f"---\nSaga report saved to: {save_path}\n---")
+        # Save the final document
+        save_path = os.path.join(self.output_dir, f"Heimdall_Saga_{self.scenario_name}.docx")
+        self.doc.save(save_path)
+        print(f"Saga report saved to: {save_path}")

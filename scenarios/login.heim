@@ -1,5 +1,32 @@
-Buka aplikasi "com.example.android"
-Tunggu sampai muncul teks "Selamat Datang"
+# Skenario Login Apps (Versi Index + Fitur Cluster)
+
+# -----------------------------------------------------------
+# CLUSTER 1: Membuka Aplikasi & Validasi Awal
+# Ini akan jadi kotak pertama di Mindmap
+# -----------------------------------------------------------
+# FITUR: Validasi Halaman Login
+Buka aplikasi "com.nama.package"
+Tunggu sampai muncul teks "Selamat datang asd"
+Pastikan muncul teks "Masuk untuk dapat menggunakan as+"
+
+# -----------------------------------------------------------
+# CLUSTER 2: Proses Input Data & Klik
+# Input email, password, dan klik tombol akan jadi satu kotak besar
+# -----------------------------------------------------------
+# FITUR: Input Kredensial User
+# Input Email (Kotak Pertama / Index 0)
+Ketik "user1@email.com" pada kolom "urutan 1"
+
+# Input Password (Kotak Kedua / Index 1)
+Ketik "abab" pada kolom "urutan 2"
+
+# Eksekusi Login
 Ketuk tombol "Masuk"
-Ketik "qa_user" pada kolom "Username"
-Pastikan muncul teks "Dashboard"
+
+# -----------------------------------------------------------
+# CLUSTER 3: Validasi Berhasil (Pindah Halaman)
+# Ini kotak terakhir yang menandakan kita sudah masuk fitur baru
+# -----------------------------------------------------------
+# FITUR: Dashboard Utama (Home)
+# Kita tambah 'Tunggu' biar aman loadingnya
+Pastikan muncul teks "Home"
