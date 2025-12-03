@@ -1,102 +1,62 @@
 import subprocess
-import threading
-from collections import deque
 import re
-from urllib.parse import urlparse
+import threading
+import time
 
-class VisionLog:
-    """
-    Sniffs ADB logcat for specific keywords in a non-blocking thread.
-    """
-
-    def __init__(self, keywords=None, max_lines=50):
-        """
-        Initializes the logcat sniffer.
-
-        Args:
-            keywords (list, optional): A list of keywords to filter for (e.g., ['HTTP', 'API']).
-                                       Defaults to None, which captures all logs.
-            max_lines (int): The maximum number of recent matching log lines to store.
-        """
-        self.keywords = keywords or []
-        self.log_buffer = deque(maxlen=max_lines)
-        self.is_running = False
-        self._log_thread = None
-
-    def _monitor_logcat(self):
-        """
-        The internal method that runs in a separate thread to monitor logcat.
-        """
-        # Clear previous logs
-        subprocess.run(["adb", "logcat", "-c"], check=False)
-        
-        process = subprocess.Popen(["adb", "logcat"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        
-        # Regex for request and response lines
-        req_pattern = re.compile(r"--> (GET|POST|PUT|DELETE) (https://[^ ]+)")
-        res_pattern = re.compile(r"<-- (\d{3})")
-
-        temp_request = None
-
-        while self.is_running and not process.poll():
-            line = process.stdout.readline()
-            if not line:
-                continue
-
-            if "OkHttp" not in line:
-                continue
-
-            req_match = req_pattern.search(line)
-            if req_match:
-                method, url = req_match.groups()
-                path = urlparse(url).path
-                temp_request = {"method": method, "endpoint": path}
-                continue
-
-            res_match = res_pattern.search(line)
-            if res_match and temp_request:
-                status_code = res_match.group(1)
-                temp_request["status_code"] = status_code
-                self.log_buffer.append(temp_request)
-                temp_request = None
-
-        process.terminate()
+class LogSniffer:
+    def __init__(self):
+        self.logs = []
+        self.stop_event = threading.Event()
+        self.thread = None
 
     def start(self):
-        """
-        Starts the logcat monitoring thread.
-        """
-        if self.is_running:
-            print("VisionLog is already running.")
-            return
+        subprocess.run(["adb", "logcat", "-c"]) # Clear logs
+        self.thread = threading.Thread(target=self._sniff)
+        self.thread.daemon = True
+        self.thread.start()
 
-        self.is_running = True
-        self._log_thread = threading.Thread(target=self._monitor_logcat, daemon=True)
-        self._log_thread.start()
-        print("VisionLog started monitoring logcat.")
+    def _sniff(self):
+        process = subprocess.Popen(
+            ["adb", "logcat", "-v", "time"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            universal_newlines=True,
+            encoding='utf-8',
+            errors='ignore'
+        )
+
+        # Regex yang lebih toleran untuk OkHttp
+        # Menangkap "<-- 200" atau "<-- 500" atau "HTTP 200"
+        status_pattern = re.compile(r'<--\s+(\d{3})') 
+        
+        # Regex URL
+        url_pattern = re.compile(r'-->\s+(GET|POST|PUT|DELETE)\s+(http[^\s]+)')
+
+        while not self.stop_event.is_set():
+            line = process.stdout.readline()
+            if not line: break
+            
+            # 1. Cek URL Request
+            url_match = url_pattern.search(line)
+            if url_match:
+                method = url_match.group(1)
+                full_url = url_match.group(2)
+                # Ambil path doang biar pendek
+                endpoint = "/" + "/".join(full_url.split('/')[3:]) 
+                self.logs.append({"method": method, "endpoint": endpoint, "status": "-"}) # Default status strip
+
+            # 2. Cek Status Response
+            status_match = status_pattern.search(line)
+            if status_match:
+                code = status_match.group(1)
+                # Jika ada request sebelumnya yang statusnya masih "-", update statusnya
+                if self.logs and self.logs[-1]["status"] == "-":
+                    self.logs[-1]["status"] = code
+
+    def get_recent_logs(self):
+        captured = self.logs[:]
+        self.logs = [] # Reset buffer
+        return captured
 
     def stop(self):
-        """
-        Stops the logcat monitoring thread.
-        """
-        if not self.is_running:
-            print("VisionLog is not running.")
-            return
-
-        self.is_running = False
-        if self._log_thread:
-            self._log_thread.join(timeout=5) # Wait for the thread to finish
-        print("VisionLog stopped.")
-
-    def get_logs(self, last_n_lines=5) -> list:
-        """
-        Retrieves the last N log entries from the buffer.
-        """
-        # Returns a list of dictionaries
-        return list(self.log_buffer)[-last_n_lines:]
-
-    def clear(self):
-        """
-        Clears the internal log buffer.
-        """
-        self.log_buffer.clear()
+        self.stop_event.set()

@@ -1,83 +1,101 @@
-import sys
-import os
-
-# Add the project root to the Python path to resolve the ModuleNotFoundError
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
 import argparse
-from heimdall.core.driver import HeimdallDriver
-from heimdall.core.parser import HeimdallParser
-from heimdall.core.vision_log import VisionLog
-from heimdall.reporters.saga_writer import SagaWriter
-from heimdall.reporters.map_builder import MapBuilder
-from heimdall.core.state_manager import StateManager
+import os
+import time
+from core.driver import HeimdallDriver
+from core.parser import HeimdallParser
+from core.vision_log import LogSniffer
+from core.storyteller import HeimdallStoryteller
+from reporters.map_builder import MapBuilder
+from reporters.saga_writer import SagaWriter
 
 def main():
-    """
-    Main entry point for the Heimdall automation tool.
-    """
-    # Set up argument parser
-    parser = argparse.ArgumentParser(description="Heimdall: A Keyword-Driven Android Automation Tool.")
-    parser.add_argument("scenario_file", help="Path to the .heim scenario file to execute.")
-    parser.add_argument("-d", "--device", help="The serial number of the target Android device.", default=None)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("file", help="Path to .heim file")
     args = parser.parse_args()
 
-    # Check if the scenario file exists
-    if not os.path.exists(args.scenario_file):
-        print(f"Error: Scenario file not found at '{args.scenario_file}'")
-        return
-
-    # --- Dynamic Directory Setup ---
-    scenario_name = os.path.splitext(os.path.basename(args.scenario_file))[0]
+    scenario_name = os.path.splitext(os.path.basename(args.file))[0]
     output_dir = os.path.join("reports", scenario_name)
-    screenshots_dir = os.path.join(output_dir, "screenshots")
-    os.makedirs(screenshots_dir, exist_ok=True)
-    print(f"Reports will be saved in: {output_dir}")
+    screenshot_dir = os.path.join(output_dir, "screenshots")
+    if not os.path.exists(screenshot_dir): os.makedirs(screenshot_dir)
 
-    # --- Initialize Core Components ---
-    vision_logger = VisionLog(keywords=["HTTP", "OkHttp", "Retrofit"])
-    saga_reporter = SagaWriter(scenario_name, output_dir=output_dir)
-    map_builder = MapBuilder(scenario_name, output_dir=output_dir)
-    state_manager = StateManager()
+    print(f"🛡️ HEIMDALL STARTING: {scenario_name}")
+    
+    driver = HeimdallDriver()
+    # PENTING: Parser baru hanya butuh driver
+    heim_parser = HeimdallParser(driver)
+    
+    mapper = MapBuilder(scenario_name, output_dir)
+    saga = SagaWriter(scenario_name, output_dir)
+    
+    # Start Sniffer di awal
+    sniffer = LogSniffer()
+    sniffer.start()
+    
+    step_counter = 0
+    current_activity = "Start"
 
     try:
-        # Start logcat monitoring
-        vision_logger.start()
+        # Loop langkah demi langkah
+        for step in heim_parser.parse_file(args.file):
+            if step['type'] == 'feature':
+                print(f"\n--- [Feature: {step['name']}] ---")
+                mapper.set_feature(step['name'])
+                continue
+            
+            step_counter += 1
+            
+            # --- 1. GENERATE STORY (User POV) ---
+            # Kita buat narasi SEBELUM eksekusi agar user tau apa yang 'akan' dilakukan
+            raw_target = str(step['args'][0]) if step['args'] else ""
+            user_narrative = HeimdallStoryteller.generate_narrative(step['cmd'], raw_target)
+            
+            print(f"[Step {step_counter}]> {user_narrative}")
+            
+            try:
+                # --- 2. EKSEKUSI ---
+                cmd = step['cmd']
+                if cmd == "open_app": driver.d.app_start(step['args'][0])
+                elif cmd == "input_text": driver.input_text_on_field(step['args'][0], step['args'][1])
+                elif cmd == "click":
+                    if str(step['args'][0]).upper() == "FAB": driver.find_element_robust("FAB").click()
+                    else: driver.find_element_robust(step['args'][0]).click()
+                elif cmd == "wait": driver.find_element_robust(step['args'][0])
+                elif cmd == "assert": 
+                    if not driver.find_element_robust(step['args'][0]).exists: raise Exception("Assert Failed")
+                elif cmd == "scroll": driver.scroll_down_coordinate()
 
-        # 1. Initialize the driver
-        print("Initializing Heimdall Driver...")
-        driver = HeimdallDriver(device_serial=args.device)
-        print(f"Connected to device: {driver.d.device_info['serial']}")
+                # --- 3. TUNGGU API (Fix Status ?) ---
+                # Beri waktu lebih lama (2.5 detik) agar response API sempat masuk log
+                time.sleep(2.5) 
 
-        # 2. Initialize the parser with all components
-        parser = HeimdallParser(
-            driver=driver,
-            logger=vision_logger,
-            reporter=saga_reporter,
-            state=state_manager,
-            map_builder=map_builder,
-            screenshots_dir=screenshots_dir
-        )
+                # --- 4. DATA COLLECTION ---
+                next_activity = driver.get_current_activity()
+                ss_path = os.path.join(screenshot_dir, f"step_{step_counter}.png")
+                driver.take_screenshot(ss_path)
+                
+                # Ambil log API terbaru
+                api_logs = sniffer.get_recent_logs()
+                
+                # --- 5. REPORTING ---
+                # PENTING: Gunakan 'user_narrative' (bukan step['desc'])
+                saga.add_step(step_counter, user_narrative, current_activity, ss_path, api_logs)
+                
+                mapper.add_transition(current_activity, user_narrative, next_activity, "Success")
+                current_activity = next_activity
 
-        # Execute the scenario
-        parser.parse_file(args.scenario_file)
+            except Exception as e:
+                print(f"!!! ERROR: {e}")
+                mapper.add_transition(current_activity, step['desc'], current_activity, "Failed")
+                raise e
 
     except Exception as e:
-        print(f"\n--- A critical error occurred ---")
-        print(f"Error details: {e}")
+        print(f"!!! Critical Failure: {e}")
     finally:
-        # Stop services and generate final reports
-        vision_logger.stop()
-        saga_reporter.save()
-        
-        # Build and save the final map
-        map_builder.render_map()
-        
-        # --- TAMBAHAN: Restore Keyboard ---
-        if 'driver' in locals():
-            driver.stop_driver()
-
-
+        sniffer.stop()
+        saga.save()
+        mapper.render_map()
+        driver.stop_driver()
+        print("=== HEIMDALL SESSION ENDED ===")
 
 if __name__ == "__main__":
     main()
