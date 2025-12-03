@@ -1,121 +1,129 @@
 from docx import Document
-from docx.shared import Inches, Pt
+from docx.shared import Inches, Pt, RGBColor
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.oxml.ns import qn
+from docx.oxml import OxmlElement
 import os
-import json
-import re
-
-def _format_json_log(log_line: str) -> str:
-    """Extracts and formats a JSON string from a log line."""
-    # Regex to find a JSON object (starts with { or [)
-    match = re.search(r'[{\[].*' , log_line)
-    if not match:
-        return log_line # Return original if no JSON is found
-
-    json_str = match.group(0)
-    try:
-        # Load and re-dump with indentation
-        parsed_json = json.loads(json_str)
-        return json.dumps(parsed_json, indent=4)
-    except json.JSONDecodeError:
-        return json_str # Return the raw string if parsing fails
 
 class SagaWriter:
-    """
-    Generates a narrative .docx report of a test scenario.
-    """
-    def __init__(self, scenario_name: str, output_dir: str):
-        """
-        Initializes the SagaWriter and creates the document.
-
-        Args:
-            scenario_name (str): The name of the test scenario.
-            output_dir (str): The directory where the report will be saved.
-        """
-        self.scenario_name = scenario_name
+    def __init__(self, scenario_name, output_dir):
+        self.document = Document()
+        
+        # --- HEADER DOKUMEN ---
+        title = self.document.add_heading(level=0)
+        run = title.add_run(f'Heimdall Saga: {scenario_name}')
+        run.font.name = 'Segoe UI'
+        run.font.color.rgb = RGBColor(0, 51, 102) # Dark Blue Professional
+        
         self.output_dir = output_dir
-        self.doc = Document()
-        self.doc.add_heading(f"Heimdall Saga: {scenario_name}", level=0)
-        self.doc.add_paragraph(f"This document details the execution of the '{scenario_name}' scenario.")
+        # Bersihkan nama file dari karakter aneh
+        safe_name = "".join([c for c in scenario_name if c.isalnum() or c in (' ', '-', '_')]).strip()
+        self.file_path = os.path.join(output_dir, f"Heimdall_Saga_{safe_name}.docx")
 
-    def add_step(self, step_command: str, step_number: int, screenshot_path: str, context_data: dict):
+    def add_step(self, step_num, description, activity_name, screenshot_path, api_logs=None):
         """
-        Adds a single step to the report in a two-column table.
-
-        Args:
-            step_command (str): The .heim command that was executed.
-            step_number (int): The step number in the sequence.
-            screenshot_path (str): Path to the screenshot image for this step.
-            context_data (dict): A dictionary containing context like 'activity' and 'logs'.
+        Menambahkan langkah tes ke dokumen dengan layout profesional.
         """
-        self.doc.add_heading(f"Step {step_number}: {step_command}", level=2)
+        # 1. STEP HEADER (Judul Langkah)
+        # Ganti background/style heading agar lebih rapi
+        heading = self.document.add_heading(level=1)
+        run = heading.add_run(f"Step {step_num}: {description}")
+        run.font.name = 'Segoe UI'
+        run.font.size = Pt(14)
+        run.font.color.rgb = RGBColor(0, 0, 0)
 
-        # Create a two-column table
-        table = self.doc.add_table(rows=1, cols=2)
-        table.autofit = False
-        table.columns[0].width = Inches(3.5)
-        table.columns[1].width = Inches(4.0)
-        
-        # Get table cells
-        left_cell = table.cell(0, 0)
-        right_cell = table.cell(0, 1)
+        # 2. ACTIVITY INFO (Kecil di bawah judul)
+        p_info = self.document.add_paragraph()
+        run_info = p_info.add_run(f"📍 Current Activity: {activity_name}")
+        run_info.font.size = Pt(9)
+        run_info.italic = True
+        run_info.font.color.rgb = RGBColor(100, 100, 100) # Grey
 
-        # --- Left Column: Screenshot ---
-        # Add the picture to the cell's paragraph
-        p_left = left_cell.paragraphs[0]
-        run_left = p_left.add_run()
-        if os.path.exists(screenshot_path):
+        # 3. SCREENSHOT (Tengah)
+        if screenshot_path and os.path.exists(screenshot_path):
             try:
-                run_left.add_picture(screenshot_path, width=Inches(3.2))
+                # Add picture centered
+                paragraph = self.document.add_paragraph()
+                paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                run = paragraph.add_run()
+                run.add_picture(screenshot_path, width=Inches(2.5)) # Ukuran pas, tidak kegedean
             except Exception as e:
-                p_left.text = f"[Error adding screenshot: {e}]"
-        else:
-            p_left.text = "[Screenshot not available]"
+                self.document.add_paragraph(f"[Error loading screenshot: {e}]")
 
-        # --- Right Column: Context ---
-        p_right = right_cell.paragraphs[0]
-        p_right.text = "" # Clear any default text
-        
-        # Add Activity
-        p_right.add_run('Activity:\n').bold = True
-        font = p_right.runs[-1].font
-        font.size = Pt(11)
-        activity = context_data.get('activity', 'N/A')
-        p_right.add_run(f"{activity}\n\n")
+        # 4. API LOG TABLE (Professional Grid)
+        # Hanya render tabel jika ada data API
+        if api_logs and isinstance(api_logs, list) and len(api_logs) > 0:
+            
+            # Sub-header kecil untuk tabel
+            p_api = self.document.add_paragraph()
+            p_api.paragraph_format.space_before = Pt(10)
+            p_api.paragraph_format.space_after = Pt(2)
+            run_api = p_api.add_run("📡 API Network Activity")
+            run_api.bold = True
+            run_api.font.size = Pt(10)
+            run_api.font.color.rgb = RGBColor(0, 51, 102)
 
-        # Add Logs in a table
-        logs = context_data.get('logs', [])
-        if logs:
-            p_right.add_run('API Log Summary:\n').bold = True
-            log_table = self.doc.add_table(rows=1, cols=3, style='Table Grid')
-            log_table.autofit = True
-            hdr_cells = log_table.rows[0].cells
-            hdr_cells[0].text = 'Method'
-            hdr_cells[1].text = 'Endpoint'
-            hdr_cells[2].text = 'Status'
+            # Buat Tabel dengan Style 'Table Grid' (Ada Garisnya)
+            table = self.document.add_table(rows=1, cols=3)
+            table.style = 'Table Grid' 
+            table.autofit = False 
+            
+            # Set Lebar Kolom Manual (Biar rapi)
+            # Total width kertas A4 margin normal ~6 inches
+            table.columns[0].width = Inches(0.8)  # Method
+            table.columns[1].width = Inches(3.5)  # Endpoint
+            table.columns[2].width = Inches(1.2)  # Status
 
-            for log_entry in logs:
-                row_cells = log_table.add_row().cells
-                row_cells[0].text = log_entry.get('method', 'N/A')
-                row_cells[1].text = log_entry.get('endpoint', 'N/A')
+            # --- TABLE HEADER ---
+            hdr_cells = table.rows[0].cells
+            self._set_cell_text(hdr_cells[0], "METHOD", bold=True)
+            self._set_cell_text(hdr_cells[1], "ENDPOINT", bold=True)
+            self._set_cell_text(hdr_cells[2], "STATUS", bold=True)
+            
+            # Beri warna background header (Light Grey)
+            for cell in hdr_cells:
+                self._set_cell_background(cell, "F2F2F2")
+
+            # --- TABLE CONTENT ---
+            for log in api_logs:
+                # Pastikan log punya keys yang benar (handle jika log string/dict)
+                method = log.get('method', '-') if isinstance(log, dict) else "-"
+                endpoint = log.get('endpoint', '-') if isinstance(log, dict) else str(log)
+                status = str(log.get('status', '-')) if isinstance(log, dict) else "-"
+
+                row_cells = table.add_row().cells
                 
-                status = str(log_entry.get('status_code', 'N/A'))
-                if status.startswith('2'):
-                    status_icon = '✅'
-                elif status.startswith(('4', '5')):
-                    status_icon = '❌'
-                else:
-                    status_icon = ''
-                row_cells[2].text = f'{status_icon} {status}'
-        else:
-            p_right.add_run("No relevant logs captured.\n")
+                # Method (Bold)
+                self._set_cell_text(row_cells[0], method, size=8)
+                
+                # Endpoint (Monospace font ala kodingan)
+                self._set_cell_text(row_cells[1], endpoint, size=8, font_name='Consolas')
+                
+                # Status (Dengan Emoji)
+                status_text = f"✅ {status}" if status.startswith('2') else f"❌ {status}"
+                self._set_cell_text(row_cells[2], status_text, size=8, bold=True)
 
-        self.doc.add_paragraph() # Add some space after the table
+        self.document.add_paragraph("\n") # Spacer antar step
+
+    def _set_cell_text(self, cell, text, bold=False, size=9, font_name='Segoe UI'):
+        """Helper untuk format text di dalam sel tabel"""
+        cell.text = "" # Clear default
+        paragraph = cell.paragraphs[0]
+        run = paragraph.add_run(text)
+        run.font.bold = bold
+        run.font.size = Pt(size)
+        run.font.name = font_name
+
+    def _set_cell_background(self, cell, color_hex):
+        """Helper untuk memberi warna background sel tabel (XML manipulation)"""
+        tc_pr = cell._element.get_or_add_tcPr()
+        shd = OxmlElement('w:shd')
+        shd.set(qn('w:fill'), color_hex)
+        tc_pr.append(shd)
 
     def save(self):
-        """
-        Saves the final Word document.
-        """
-        # Save the final document
-        save_path = os.path.join(self.output_dir, f"Heimdall_Saga_{self.scenario_name}.docx")
-        self.doc.save(save_path)
-        print(f"Saga report saved to: {save_path}")
+        try:
+            self.document.save(self.file_path)
+            print(f"  📄 Report saved: {self.file_path}")
+        except Exception as e:
+            print(f"!!! Error saving docx: {e}")

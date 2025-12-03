@@ -72,6 +72,11 @@ def main():
         
         # Build and save the final map
         map_builder.render_map()
+        
+        # --- TAMBAHAN: Restore Keyboard ---
+        if 'driver' in locals():
+            driver.stop_driver()
+
 
 
 if __name__ == "__main__":

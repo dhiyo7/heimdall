@@ -44,7 +44,7 @@ Sebelum mulai *running*, pastikan laptop kalian sudah siap. Lakukan langkah ini 
 Buka terminal di folder project ini, lalu ketik:
 
 ```bash
-pip install \-r requirements.txt
+pip install -r requirements.txt
 ```
 
 ### **3\. Siapkan HP Android**
@@ -53,7 +53,7 @@ pip install \-r requirements.txt
 * Pastikan **USB Debugging** sudah *ON*.  
 * Jalankan inisialisasi driver (cuma perlu sekali seumur hidup per HP):
 ```bash  
-  python \-m uiautomator2 init
+  python -m uiautomator2 init
 ```
 
   *(Izinkan semua instalasi aplikasi ATX/Automator di layar HP)*.
@@ -70,6 +70,7 @@ Gak perlu jago coding\! Cukup buat file baru di folder scenarios/ dengan akhiran
 | **Ketik (Label)** | Ketik "user" pada kolom "Email" | Mencari kolom input di dekat label "Email". |
 | **Ketik (Urutan)** | Ketik "123" pada kolom "urutan 1" | **Jurus Sakti\!** Mengisi kolom input pertama (index 0\) yang ditemukan di layar. Gunakan ini jika label susah dideteksi. |
 | **Ketuk** | Ketuk tombol "Masuk" | Klik tombol/teks bernama "Masuk". |
+| **Ketuk (FAB)** |	Ketuk tombol "FAB" |	**BARU!**  Khusus klik tombol melayang (+) di pojok kanan bawah. Menggunakan koordinat pintar.
 | **Tunggu** | Tunggu sampai muncul teks "Home" | Menunggu (loading) sampai teks tertentu muncul. |
 | **Pastikan** | Pastikan muncul teks "Success" | Validasi (Assertion). Jika teks tidak muncul, test dianggap **GAGAL**. |
 | **Gulir** | Gulir ke "Bawah" | Scroll manual (Engine sudah punya *Smart Scroll*, tapi ini untuk memaksa). |
@@ -100,12 +101,36 @@ Tunggu sampai muncul teks "Login berhasil"
 Pastikan muncul teks "Home"
 ```
 
+## **⚠️ Troubleshooting & Tips (Wajib Baca!)**
+1. **Masalah Emulator: Keyboard Hilang?**
+Heimdall menggunakan "Ghost Keyboard" (FastInputIME) untuk mencegah error looping fokus pada Emulator.
+
+- **Efek Samping:** Saat script berjalan (atau setelah script stop mendadak/crash), Keyboard HP mungkin **TIDAK MUNCUL** saat kalian mau ngetik manual.
+
+- **Solusi:** Tools ini sudah dilengkapi fitur Auto-Restore. Namun jika keyboard kalian hilang permanen:
+
+   1. Jalankan script dummy sekali lagi sampai selesai (driver akan merestore keyboard di akhir sesi), ATAU
+
+   2. Matikan FastInputIME manual lewat terminal:
+
+```bash
+adb shell settings put secure default_input_method com.android.inputmethod.latin/.LatinIME
+```
+
+2. Tips Tombol Tanpa ID (VirtualFAB)
+- Jika ketemu tombol Tambah (+) yang melayang dan tidak punya ID:
+Cukup tulis: Ketuk tombol "FAB".
+
+- Driver otomatis menembak koordinat (X=85%, Y=80%) layar (di atas Bottom Bar).
+
+
+
 ## **▶️ Cara Eksekusi**
 
 Buka terminal di folder project, lalu jalankan perintah:
 
 ```bash
-python main.py scenarios/nama\_file.heim
+python main.py scenarios/nama_file.heim
 ```
 
 Contoh:
