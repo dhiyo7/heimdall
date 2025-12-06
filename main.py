@@ -14,7 +14,7 @@ ctx = {
     "driver": None,
     "parser": None,
     "state": None,
-    "mapper": None,  # <--- Engine Mermaid Baru
+    "mapper": None,
     "saga": None,
     "sniffer": None,
     "ss_dir": "",
@@ -37,7 +37,7 @@ def main():
     ctx["driver"] = HeimdallDriver()
     ctx["parser"] = HeimdallParser(ctx["driver"])
     ctx["state"] = StateManager()
-    ctx["mapper"] = MapBuilder(scenario_name, output_dir) # Init Mermaid Builder
+    ctx["mapper"] = MapBuilder(scenario_name, output_dir)
     ctx["saga"] = SagaWriter(scenario_name, output_dir)
     ctx["sniffer"] = LogSniffer()
     ctx["sniffer"].start()
@@ -46,16 +46,14 @@ def main():
         for step in ctx["parser"].parse_file(args.file):
             process_step(step)
             
-        # Penutup Manis
         ctx["mapper"].add_step("Selesai", "end")
 
     except Exception as e:
-        print(f"!!! Critical Failure: {e}")
+        print(f"!!! Critical System Failure: {e}")
     finally:
         ctx["sniffer"].stop()
         ctx["saga"].save()
-        # Render Gambar di Akhir
-        ctx["mapper"].render_map() 
+        ctx["mapper"].render_map()
         ctx["driver"].stop_driver()
         print("=== HEIMDALL SESSION ENDED ===")
 
@@ -66,34 +64,29 @@ def process_step(step):
         ctx["mapper"].set_feature(step['name'])
         return
 
-    # B. Conditional Logic (JIKA) -> Visual Diamond
+    # B. Conditional Logic
     if step.get('type') == 'conditional':
         raw_cond = step['condition']
         target = ctx["state"].resolve_text(raw_cond)
         
-        # 1. Catat Node Diamond di Diagram
-        # "Apakah muncul X?"
-        narrative = f"Muncul '{target}'?"
-        ctx["mapper"].add_step(narrative, step_type="logic")
-        
+        ctx["mapper"].add_step(f"Muncul '{target}'?", step_type="logic")
         print(f"  ❓ [Logic] Mengecek kondisi: '{target}'...")
+        
         is_visible = False
         try:
             ctx["driver"].d(textContains=target).wait(timeout=2.0)
-            if ctx["driver"].d(textContains=target).exists:
-                is_visible = True
+            if ctx["driver"].d(textContains=target).exists: is_visible = True
         except: pass
 
         if is_visible:
             print(f"  ✅ [Logic] TRUE. Masuk blok JIKA.")
-            # Rekursif: Jalankan isi body
             for sub_step in ctx["parser"].parse_lines(step['body'], "Conditional Block"):
                 process_step(sub_step)
         else:
             print(f"  ⏩ [Logic] FALSE. Skip.")
         return
 
-    # C. Standard Action -> Visual Box
+    # C. Standard Action
     ctx["step_count"] += 1
     
     resolved_args = []
@@ -111,7 +104,7 @@ def process_step(step):
         cmd = step['cmd']
         driver = ctx["driver"]
         
-        # Eksekusi Driver
+        # --- EKSEKUSI ---
         if cmd == "open_app": driver.d.app_start(resolved_args[0])
         elif cmd == "input_text": driver.input_text_on_field(resolved_args[0], resolved_args[1])
         elif cmd == "click":
@@ -131,7 +124,7 @@ def process_step(step):
             elif key == "enter": driver.d.press("enter")
             else: driver.d.press(key)
 
-        # Reporting
+        # --- SUKSES ---
         time.sleep(1.5)
         next_act = driver.get_current_activity()
         ss_path = os.path.join(ctx["ss_dir"], f"step_{ctx['step_count']}.png")
@@ -141,16 +134,28 @@ def process_step(step):
         ctx["saga"].add_step(ctx["step_count"], narrative, ctx["activity"], ss_path, logs)
         ctx["state"].update_activity(next_act)
         ctx["activity"] = next_act
-        
-        # --- UPDATE DIAGRAM MERMAID ---
-        # Catat langkah sukses ini ke diagram
         ctx["mapper"].add_step(narrative, step_type="action")
 
     except Exception as e:
-        print(f"!!! ERROR: {e}")
-        # Catat Error di Diagram
-        ctx["mapper"].add_step(f"Error: {step.get('desc')}", step_type="error")
-        raise e
+        # --- [MODIFIKASI: SOFT FAILURE] ---
+        # Jangan raise e (jangan matikan program)
+        # Cukup catat error dan lanjut
+        print(f"!!! ERROR (Soft Fail): {e}")
+        
+        # Ambil Screenshot Error
+        err_path = os.path.join(ctx["ss_dir"], f"error_step_{ctx['step_count']}.png")
+        ctx["driver"].take_screenshot(err_path)
+        
+        # Catat di Report sebagai Error tapi Lanjut
+        # Kita beri tanda [FAILED] di narasi agar user tau
+        fail_narrative = f"[FAILED] {narrative}"
+        ctx["saga"].add_step(ctx["step_count"], fail_narrative, ctx["activity"], err_path, [{"status": "ERROR", "msg": str(e)}])
+        
+        # Catat di Diagram sebagai Merah
+        ctx["mapper"].add_step(narrative, step_type="error")
+        
+        # PENTING: Jangan 'raise e' disini agar loop for di atas tetap lanjut
+        pass 
 
 if __name__ == "__main__":
     main()
