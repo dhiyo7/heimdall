@@ -15,10 +15,10 @@ Pastikan muncul teks "Masuk untuk dapat menggunakan Field Sales+"
 # -----------------------------------------------------------
 # FITUR: Input Kredensial User
 # Input Email (Kotak Pertama / Index 0)
-Ketik "jokoiswaji91@email.com" pada kolom "urutan 1"
+Ketik "aa@email.com" pada kolom "urutan 1"
 
 # Input Password (Kotak Kedua / Index 1)
-Ketik "bbxidaa" pada kolom "urutan 2"
+Ketik "asda" pada kolom "urutan 2"
 
 # Eksekusi Login
 Ketuk tombol "Masuk"
