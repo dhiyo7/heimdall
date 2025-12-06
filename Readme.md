@@ -205,59 +205,134 @@ Setelah test selesai, cek folder reports/nama\_test\_kalian/. Kalian akan mendap
    * **API Log Summary:** Tabel ringkas request API (Endpoint & Status Code 200 OK).  
 2. **🗺️ Flowchart Bisnis (flowchart.png)**:  
    * Diagram alur otomatis yang digambar oleh Mermaid JS.  
-   * Memvisualisasikan **Logic (Diamond)** dan **Looping (Panah Balik)**.  
-   * Dikelompokkan berdasarkan Cluster Fitur.
+1.  **📄 Laporan Word (Heimdall\_Saga\_...docx)**:
+    *   Format Slide Presentation (1 Step \= 1 Halaman).
+    *   Narasi otomatis ala User ("User melakukan...").
+    *   **API Log Summary:** Tabel ringkas request API (Endpoint & Status Code 200 OK).
+2.  **🗺️ Flowchart Bisnis (flowchart.png)**:
+    *   Diagram alur otomatis yang digambar oleh Mermaid JS.
+    *   Memvisualisasikan **Logic (Diamond)** dan **Looping (Panah Balik)**.
+    *   Dikelompokkan berdasarkan Cluster Fitur.
 
 ## **🗺️ HEIMDALL ASCENSION ROADMAP**
 
-Berikut adalah status pengembangan Heimdall saat ini:
+### ✅ PHASE 1: THE FOUNDATION (Pondasi Fisik)
+**Status:** Completed 100%
 
-#### **✅ PHASE 1: THE FOUNDATION (Selesai)**
+*Fokus: Membangun driver yang stabil agar robot bisa berinteraksi dengan HP Android tanpa crash.*
 
-*Pondasi fisik robot agar kuat, stabil, dan bisa melihat.*
+- [x] **Smart Driver Engine (`core/driver.py`)**
+    - **Robust Find:** Mencari elemen berdasarkan ID, Teks, atau Description secara bergantian.
+    - **Auto Scroll:** Otomatis gulir ke bawah jika elemen tidak ditemukan di layar.
+    - **Virtual FAB:** Klik koordinat khusus untuk tombol melayang (Floating Action Button).
 
-* \[x\] **Smart Driver:** Auto-scroll, pencarian elemen pintar (ID/Teks/Desc), Virtual FAB (Koordinat).  
-* \[x\] **Stability Engine:** Ghost Keyboard (Anti-looping Emulator), Auto-dismiss keyboard.  
-* \[x\] **Basic Reporting:** Saga Report (.docx) format Slide Presentation.  
-* \[x\] **Logging:** API Sniffer (Capture Status Code 200 OK vs 500 Error).
+- [x] **Stability Mechanism**
+    - **Ghost Keyboard:** Menggunakan FastInputIME untuk mengetik cepat tanpa pop-up keyboard yang menutupi layar.
+    - **Anti-Looping:** Mencegah robot terjebak mencari elemen selamanya (Timeout logic).
 
-#### **✅ PHASE 2: THE BRAIN (Selesai) 🧠**
+- [x] **Basic Reporting**
+    - **Saga Writer:** Generate laporan .docx dengan format 1 Halaman = 1 Langkah + Screenshot.
 
-*Menanamkan kecerdasan buatan agar robot bisa berpikir logis.*
+- [x] **API Sniffer (`core/vision_log.py`)**
+    - **Menangkap log HTTP request** di background (Status 200/500).
 
-* \[x\] **Global Memory:** SIMPAN teks ... KE {Var} (Menyimpan data antar langkah/file).  
-* \[x\] **Conditional Logic:** JIKA ... AKHIR JIKA (Handling pop-up, error sync).  
-* \[x\] **Looping:** ULANGI ... DARI \[...\] (Input data massal/berulang).  
-* \[x\] **Modular Architecture:** JALANKAN "file.heim" (Re-use script login/setup).  
-* \[x\] **System Keys:** TEKAN TOMBOL SISTEM "Back" (Navigasi fisik Android).
+### ✅ PHASE 2: THE BRAIN (Kecerdasan Logika)
+**Status:** Completed 100%
 
-#### **✅ PHASE 3: VISUAL INTELLIGENCE (Selesai) 🧜‍♀️**
+*Fokus: Membuat robot bisa "Mikir", mengingat data, dan mengambil keputusan.*
 
-*Mengubah log teknis menjadi diagram bisnis yang cantik.*
+- [x] **Global Memory System (`core/state_manager.py`)**
+    - **Syntax:** SIMPAN teks dari "ID" KE "{Variabel}".
+    - **Fitur:** Menyimpan teks dari layar dan memanggilnya kembali di langkah berikutnya.
 
-* \[x\] **Mermaid Engine:** Migrasi dari Graphviz ke Mermaid JS (Modern Standard).  
-* \[x\] **Smart Mapping:** Menggambar simbol **Diamond 🔸** (Logika) dan **Loop 🔄** otomatis.  
-* \[x\] **Modern Styling:** Tema visual "Wide & Dynamic" dengan pewarnaan Cluster otomatis.  
-* \[x\] **Rendering:** Generate file flowchart.png otomatis via API mermaid.ink.
+- [x] **Conditional Logic**
+    - **Syntax:** JIKA muncul teks "X" ... AKHIR JIKA.
+    - **Fitur:** Handling pop-up iklan, error message, atau alur bercabang.
 
-#### **🚧 PHASE 4: THE PLATFORM REVOLUTION (Next Target) 🖥️**
+- [x] **Looping Mechanism**
+    - **Syntax:** ULANGI "Var" DARI ["A", "B"] ... SELESAI ULANGI.
+    - **Fitur:** Input data massal atau cek menu berulang tanpa copy-paste script.
 
-*Mengubah tool "Hacker Terminal" menjadi Aplikasi Web Modern.*
+- [x] **Modular Architecture**
+    - **Syntax:** JALANKAN "path/to/script.heim".
+    - **Fitur:** Re-use script (misal: Login module dipanggil di banyak test).
 
-* \[ \] **Heimdall Web Center (Streamlit):**  
-  * **Dashboard GUI:** Tidak perlu lagi ketik di layar hitam. Cukup klik tombol di browser.  
-  * **Scenario Selector:** Dropdown menu untuk memilih file .heim.  
-  * **Device Manager:** Auto-detect HP yang tercolok.  
-  * **Live Execution Viewer:** Melihat log perjalanan robot secara *real-time*.
+- [x] **System Keys**
+    - **Syntax:** TEKAN TOMBOL SISTEM "Back".
+    - **Fitur:** Navigasi tombol fisik (Back, Home, Recent, Enter).
 
-#### **🔮 PHASE 5: ENTERPRISE SCALE (Masa Depan) 🚀**
+### ✅ PHASE 3: VISUAL INTELLIGENCE (Visualisasi Bisnis)
+**Status:** Completed 100%
 
-*Fitur skala besar untuk kebutuhan korporat.*
+*Fokus: Mengubah log teknis menjadi Diagram Alur Bisnis yang cantik.*
 
-* \[ \] **Cross-Platform Installer:** Mengemas jadi .exe (Windows) atau .dmg (Mac).  
-* \[ \] **Parallel Execution (Kage Bunshin):** Menjalankan 1 script di 3 HP berbeda secara serentak.  
-* \[ \] **RTM Integration:** Mapping ID Tiket Jira di header report otomatis.  
-* \[ \] **Notification Bot:** Kirim notifikasi "Tes Selesai" ke Slack/Telegram.  
-* \[ \] **Record & Replay:** Bikin script otomatis dengan merekam klik mouse ("The Ghostwriter").
+- [x] **Mermaid JS Migration (`reporters/map_builder.py`)**
+    - Mengganti Graphviz dengan Mermaid untuk hasil yang lebih modern.
+
+- [x] **Smart Flowchart Mapping**
+    - **Diamond Shape (🔸):** Otomatis menggambar percabangan saat ada logika JIKA.
+    - **Loop Arrow (🔄):** Otomatis menggambar panah balik saat ada ULANGI.
+    - **Cluster Coloring:** Memberi warna background berbeda untuk setiap fitur/modul.
+
+- [x] **Rendering Engine**
+    - **Hit API mermaid.ink** untuk convert kode teks jadi file .png.
+    - **Auto-embed (tempel)** gambar Flowchart ke halaman pertama laporan Word.
+
+### 🚧 PHASE 4: THE PLATFORM REVOLUTION (Transformasi GUI)
+**Status:** 90% Completed (Sisa Packaging)
+
+*Fokus: Mengubah tool CLI (Terminal Hitam) menjadi Aplikasi Web Dashboard yang User Friendly.*
+
+- [x] **Heimdall Web Center (`app.py`)**
+    - **Dashboard UI:** Sidebar menu, Dark mode support, Layout responsif.
+    - **Device Manager:** Auto-detect serial number HP via ADB.
+    - **Scenario Selector:** Dropdown menu otomatis membaca isi folder `scenarios/`.
+
+- [x] **Live Execution System**
+    - **Real-time Log:** Menampilkan log terminal baris-per-baris di browser (Fix python -u).
+    - **Resilience Mode (Soft Assertion):** Robot tidak berhenti saat error, lanjut ke step berikutnya, tapi tetap mencatat status FAIL.
+
+- [x] **Executive Analytics**
+    - **Pie Chart:** Visualisasi persentase Pass (Hijau) vs Fail (Merah).
+    - **Detail Table:** Tabel interaktif berisi daftar langkah dan statusnya.
+
+- [x] **Download Hub**
+    - Tombol download laporan Word & Flowchart langsung dari browser.
+
+- [ ] **Portable Packaging (PR KITA BERIKUTNYA)**
+    - **PyInstaller:** Membungkus Python + Streamlit jadi file .exe / .bat.
+    - **One-Click Run:** User tinggal klik 2x file shortcut, dashboard langsung terbuka tanpa install Python.
+
+### 🔮 PHASE 5: ENTERPRISE SCALE (Target Launch Awal Tahun)
+**Status:** Planning / Backlog
+
+*Fokus: Skalabilitas dan Distribusi Tim Besar.*
+
+- [ ] **Automated Build System (GitHub Actions)**
+    - Setup CI/CD pipeline.
+    - Setiap push code -> Otomatis build installer untuk Windows, Mac, dan Linux.
+
+- [ ] **Parallel Execution (Kage Bunshin)**
+    - Menjalankan 1 script di 3 HP berbeda secara bersamaan (Stress Test).
+
+- [ ] **Notification Hub**
+    - Bot Telegram/Slack yang mengirim pesan: "Tes Selesai. Pass: 90%, Fail: 10%. Download report di sini."
+
+### 👻 PHASE 6: FUTURE EXPANSION (Experimental)
+**Status:** R&D (Research & Development)
+
+*Fokus: Evolusi Teknologi Jangka Panjang.*
+
+- [ ] **Native Desktop App Rewrite**
+    - Jika Streamlit dirasa kurang native, rewrite UI menggunakan Flet (Flutter for Python) atau PyQt.
+
+- [ ] **Hybrid Driver (Web Testing)**
+    - Integrasi Playwright agar Heimdall bisa tes website desktop, bukan cuma Android.
+
+- [ ] **Ghostwriter (Record & Replay)**
+    - Fitur merekam layar dan klik mouse user, lalu otomatis generate script `.heim`.
+
+- [ ] **Self-Healing AI**
+    - Jika ID tombol berubah (karena update developer), robot mencoba mencari tombol alternatif berdasarkan kemiripan visual/teks.
 
 *Happy Testing\! Biarkan Heimdall yang menjaga kualitas aplikasi kita.* 🛡️
