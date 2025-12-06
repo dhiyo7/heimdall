@@ -1,34 +1,65 @@
+import re
+
 class StateManager:
     """
-    Tracks the state of the application flow, primarily for mind map generation.
+    The Brain of Heimdall.
+    Berfungsi ganda:
+    1. Mencatat Rute Activity (untuk Mindmap).
+    2. Menyimpan Variabel Global (untuk Data Passing).
     """
 
     def __init__(self):
-        """
-        Initializes the state manager.
-        """
+        # --- BAGIAN 1: MEMORI VARIABEL (BARU) ---
+        self.variables = {}
+
+        # --- BAGIAN 2: TRACKING ACTIVITY (LAMA) ---
         self.activity_path = []
         self.last_activity = None
 
-    def update_activity(self, activity_name: str):
-        """
-        Updates the current activity, tracking the path taken.
+    # ==========================================
+    # FITUR MEMORI (Variable Storage)
+    # ==========================================
+    def set_variable(self, key, value):
+        """Menyimpan data ke memori. Contoh: {Total} = 50000"""
+        clean_key = key.replace("{", "").replace("}", "")
+        self.variables[clean_key] = str(value)
+        print(f"  🧠 [Memory] Disimpan: {{{clean_key}}} = '{value}'")
 
-        Args:
-            activity_name (str): The name of the current activity.
+    def get_variable(self, key):
+        """Mengambil data dari memori."""
+        clean_key = key.replace("{", "").replace("}", "")
+        return self.variables.get(clean_key, None)
+
+    def resolve_text(self, text):
         """
+        Magic Function! Mengganti placeholder {Var} dengan nilai aslinya.
+        Contoh input: "Harga {Total}" -> Output: "Harga 50000"
+        """
+        if not isinstance(text, str):
+            return text
+
+        # Cari pola {...}
+        matches = re.findall(r'\{(.*?)\}', text)
+        
+        resolved_text = text
+        for key in matches:
+            if key in self.variables:
+                val = self.variables[key]
+                resolved_text = resolved_text.replace(f"{{{key}}}", val)
+                
+        return resolved_text
+
+    # ==========================================
+    # FITUR TRACKING (Untuk Mindmap)
+    # ==========================================
+    def update_activity(self, activity_name: str):
+        """Update posisi activity saat ini."""
         if activity_name and activity_name != self.last_activity:
-            # To keep the map clean, let's simplify common Android activity names
             simple_name = activity_name.split('.')[-1]
             self.activity_path.append(simple_name)
             self.last_activity = activity_name
-            print(f"  [State] Activity changed to: {simple_name}")
+            # print(f"  [State] Activity changed to: {simple_name}")
 
     def get_path(self) -> list:
-        """
-        Returns the recorded path of activities.
-
-        Returns:
-            list: A list of activity names in the order they were visited.
-        """
+        """Mengambil history perjalanan."""
         return self.activity_path

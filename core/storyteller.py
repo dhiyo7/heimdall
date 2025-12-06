@@ -1,51 +1,67 @@
-import re
-
 class HeimdallStoryteller:
     """
-    Converts technical command strings into user-centric narratives.
+    Penerjemah kode teknis menjadi bahasa manusia (User POV).
+    Digunakan untuk laporan Saga.
     """
 
-    def _humanize(self, text: str) -> str:
-        """Converts an identifier into a human-readable, title-cased string."""
-        # Replace underscores/hyphens with spaces, then title case
-        return re.sub(r'[_-]', ' ', text).title()
-
-    def generate_narrative(self, command: str) -> str:
+    @staticmethod
+    def generate_narrative(cmd: str, target: str) -> str:
         """
-        Generates a narrative from a given command line.
-
-        Args:
-            command (str): The raw .heim command.
-
-        Returns:
-            str: A user-centric narrative description of the action.
-        """
-        normalized_command = command.lower()
-        args_in_quotes = re.findall(r'"(.*?)"' , command)
-        target = self._humanize(args_in_quotes[0]) if args_in_quotes else ""
-
-        if normalized_command.startswith('buka aplikasi'):
-            return f"User memulai sesi dengan membuka aplikasi {target}."
+        Menerjemahkan perintah menjadi cerita.
         
-        if normalized_command.startswith('ketik'):
-            # For input, the target is the second argument (the label)
-            target_label = self._humanize(args_in_quotes[1]) if len(args_in_quotes) > 1 else ""
-            return f"User melengkapi form dengan menginput informasi ke '{target_label}'."
+        Args:
+            cmd (str): Kode perintah (ex: 'click', 'input_text', 'press_key').
+            target (str): Objek yang dimanipulasi (ex: 'Masuk', 'Back', 'Rp 50000').
+        
+        Returns:
+            str: Kalimat narasi bahasa Indonesia.
+        """
+        target = str(target).strip()
 
-        if normalized_command.startswith('ketuk'):
-            # Context-aware click descriptions
-            if 'simpan' in target.lower():
-                return f"User menyimpan perubahan dengan memilih '{target}'."
-            if 'batal' in target.lower():
-                return f"User membatalkan aksi dengan memilih '{target}'."
-            if 'fab' in target.lower() or 'add' in target.lower():
-                return f"User memulai alur baru dengan menekan tombol '{target}'."
-            return f"User memilih opsi '{target}'."
+        # 1. BUKA APLIKASI
+        if cmd == 'open_app':
+            return f"User memulai sesi dengan membuka aplikasi paket '{target}'."
+        
+        # 2. INPUT TEKS
+        if cmd == 'input_text':
+            return f"User mengisi data '{target}' pada formulir yang tersedia."
 
-        if normalized_command.startswith('pastikan muncul') or normalized_command.startswith('tunggu sampai'):
-            return f"Sistem memverifikasi elemen '{target}' tampil di layar."
+        # 3. KLIK / KETUK (Context Aware)
+        if cmd == 'click':
+            lower_target = target.lower()
+            if 'simpan' in lower_target or 'submit' in lower_target:
+                return f"User menyimpan perubahan dengan menekan tombol '{target}'."
+            if 'batal' in lower_target or 'cancel' in lower_target:
+                return f"User membatalkan aksi dengan menekan tombol '{target}'."
+            if 'fab' in lower_target or 'tambah' in lower_target:
+                return "User memulai aktivitas baru dengan menekan tombol Tambah (FAB)."
+            return f"User memilih menu atau tombol '{target}'."
 
-        if normalized_command.startswith('gulir'):
-            return f"User melakukan navigasi dengan menggulir ke arah '{target}'."
+        # 4. TEKAN TOMBOL SISTEM (BACK, HOME) - [BARU]
+        if cmd == 'press_key':
+            key = target.lower()
+            if 'back' in key:
+                return "User menekan tombol Kembali (Back) di perangkat."
+            if 'home' in key:
+                return "User kembali ke layar utama (Home Screen)."
+            if 'enter' in key:
+                return "User menekan tombol Enter pada keyboard."
+            return f"User menekan tombol fisik '{target}'."
 
-        return command # Fallback to the raw command
+        # 5. SIMPAN KE MEMORI - [BARU]
+        if cmd == 'save_text':
+            # Target di sini biasanya selector elemennya
+            return f"Sistem membaca dan mengingat informasi dari elemen '{target}'."
+
+        # 6. VALIDASI & TUNGGU
+        if cmd == 'wait':
+            return f"Sistem menunggu hingga elemen '{target}' siap di layar."
+        if cmd == 'assert':
+            return f"Sistem memverifikasi bahwa teks '{target}' tampil valid di layar."
+
+        # 7. SCROLL
+        if cmd == 'scroll':
+            return f"User melakukan navigasi dengan menggulir layar ke '{target}'."
+
+        # Fallback
+        return f"User melakukan aksi {cmd} pada {target}."

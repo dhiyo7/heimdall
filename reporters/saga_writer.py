@@ -1,7 +1,6 @@
 from docx import Document
 from docx.shared import Inches, Pt, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
-from docx.enum.table import WD_ALIGN_VERTICAL
 from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
 import os
@@ -10,19 +9,17 @@ class SagaWriter:
     def __init__(self, scenario_name, output_dir):
         self.document = Document()
         
-        # --- DOKUMEN SETUP ---
-        # Set margin agak tipis biar muat banyak
+        # --- HEADER DOKUMEN ---
         section = self.document.sections[0]
+        section.top_margin = Inches(0.5)
+        section.bottom_margin = Inches(0.5)
         section.left_margin = Inches(0.8)
         section.right_margin = Inches(0.8)
-        section.top_margin = Inches(0.8)
-        section.bottom_margin = Inches(0.8)
 
-        # Header Utama
         title = self.document.add_heading(level=0)
         run = title.add_run(f'Heimdall Saga: {scenario_name}')
         run.font.name = 'Arial'
-        run.font.size = Pt(22)
+        run.font.size = Pt(24)
         run.font.color.rgb = RGBColor(33, 33, 33) # Dark Grey
         
         self.output_dir = output_dir
@@ -31,114 +28,96 @@ class SagaWriter:
 
     def add_step(self, step_num, description, activity_name, screenshot_path, api_logs=None):
         """
-        GRID SYSTEM:
-        -------------------------------------------
-        | [STEP HEADER & ACTIVITY]                |
-        -------------------------------------------
-        | [NARRATIVE TEXT]      | [SCREENSHOT]    |
-        |                       |                 |
-        | [API TABLE]           |                 |
-        -------------------------------------------
+        LAYOUT BARU: 1 STEP = 1 HALAMAN (Slide Style)
+        Dijamin rapi dan tidak ada jarak aneh.
         """
         
-        # 1. HEADER SECTION (Judul Step)
-        # Kita pakai Tabel 1 baris untuk header agar background bisa diwarnai (opsional)
-        header_table = self.document.add_table(rows=1, cols=1)
-        header_table.autofit = False
-        header_table.columns[0].width = Inches(6.5)
+        # 1. HEADER STEP
+        # Tabel 1 baris untuk background header (opsional, biar rapi)
+        table_head = self.document.add_table(rows=1, cols=1)
+        table_head.autofit = False
+        table_head.columns[0].width = Inches(6.5)
+        cell = table_head.cell(0, 0)
         
-        cell_header = header_table.cell(0, 0)
-        p_head = cell_header.paragraphs[0]
-        run_head = p_head.add_run(f"STEP {step_num}")
-        run_head.bold = True
-        run_head.font.size = Pt(14)
-        run_head.font.name = 'Arial'
-        run_head.font.color.rgb = RGBColor(0, 51, 102) # Navy Blue
+        p = cell.paragraphs[0]
+        run_step = p.add_run(f"STEP {step_num}")
+        run_step.bold = True
+        run_step.font.size = Pt(14)
+        run_step.font.color.rgb = RGBColor(0, 51, 102) # Navy Blue
         
-        # Activity (Subtitle)
-        p_sub = cell_header.add_paragraph()
-        run_sub = p_sub.add_run(f"📍 {activity_name}")
-        run_sub.font.size = Pt(8)
-        run_sub.italic = True
-        run_sub.font.color.rgb = RGBColor(128, 128, 128)
-        p_sub.paragraph_format.space_after = Pt(10)
+        # 2. ACTIVITY (Subtitle)
+        p_act = self.document.add_paragraph()
+        p_act.paragraph_format.space_after = Pt(6)
+        run_act = p_act.add_run(f"📍 Position: {activity_name}")
+        run_act.font.size = Pt(9)
+        run_act.italic = True
+        run_act.font.color.rgb = RGBColor(128, 128, 128)
 
-        # 2. CONTENT GRID (Kiri Teks, Kanan Gambar)
-        # Tabel utama pengunci layout
-        grid = self.document.add_table(rows=1, cols=2)
-        grid.autofit = False
-        grid.columns[0].width = Inches(3.8) # Kiri: Lebar Teks
-        grid.columns[1].width = Inches(2.7) # Kanan: Lebar Gambar
+        # 3. NARASI STORYTELLER (PENTING)
+        # Font Serif (Georgia) agar kontras dengan header
+        p_desc = self.document.add_paragraph(description)
+        p_desc.paragraph_format.space_after = Pt(12)
+        p_desc.style.font.name = 'Georgia'
+        p_desc.style.font.size = Pt(12)
 
-        # --- SEL KIRI: NARASI & API ---
-        left_cell = grid.cell(0, 0)
-        left_cell.vertical_alignment = WD_ALIGN_VERTICAL.TOP
-        
-        # A. Narasi Storyteller
-        p_desc = left_cell.paragraphs[0]
-        run_desc = p_desc.add_run(description)
-        run_desc.font.size = Pt(11)
-        run_desc.font.name = 'Georgia' # Font serif enak dibaca
-        p_desc.paragraph_format.space_after = Pt(20) # Jarak ke API
+        # 4. SCREENSHOT (BESAR & TENGAH)
+        if screenshot_path and os.path.exists(screenshot_path):
+            try:
+                p_img = self.document.add_paragraph()
+                p_img.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                run_img = p_img.add_run()
+                # Lebar 3.0 Inch (Cukup besar tapi muat di halaman)
+                run_img.add_picture(screenshot_path, width=Inches(3.0))
+            except:
+                pass
 
-        # B. Tabel API (Jika Ada)
+        # 5. TABEL API (JIKA ADA)
         if api_logs and len(api_logs) > 0:
-            p_api_title = left_cell.add_paragraph()
-            run_api = p_api_title.add_run("📡 Network Log")
+            p_api = self.document.add_paragraph()
+            p_api.paragraph_format.space_before = Pt(12)
+            run_api = p_api.add_run("📡 Network Activity Detected:")
             run_api.bold = True
             run_api.font.size = Pt(9)
             run_api.font.name = 'Arial'
+
+            # Tabel Grid
+            table = self.document.add_table(rows=1, cols=3)
+            table.style = 'Table Grid'
+            table.autofit = False
             
-            # Nested Table untuk API
-            api_table = left_cell.add_table(rows=1, cols=3)
-            api_table.style = 'Table Grid'
-            api_table.autofit = False
-            api_table.columns[0].width = Inches(0.6) # Method
-            api_table.columns[1].width = Inches(2.4) # Endpoint
-            api_table.columns[2].width = Inches(0.6) # Status
+            # Lebar Kolom
+            table.columns[0].width = Inches(0.7) # Method
+            table.columns[1].width = Inches(4.5) # Endpoint (Lebar)
+            table.columns[2].width = Inches(1.2) # Status
 
-            # Header API
-            hdr = api_table.rows[0].cells
-            self._fill_cell(hdr[0], "MTHD", bg="E0E0E0", bold=True)
-            self._fill_cell(hdr[1], "ENDPOINT", bg="E0E0E0", bold=True)
-            self._fill_cell(hdr[2], "STS", bg="E0E0E0", bold=True)
+            # Header
+            hdr = table.rows[0].cells
+            self._style_cell(hdr[0], "METHOD", bg="E0E0E0", bold=True)
+            self._style_cell(hdr[1], "ENDPOINT RESOURCE", bg="E0E0E0", bold=True)
+            self._style_cell(hdr[2], "STATUS", bg="E0E0E0", bold=True)
 
-            # Isi API
             for log in api_logs:
-                # Sanitasi Data
-                method = log.get('method', '-') if isinstance(log, dict) else "-"
-                endpoint = log.get('endpoint', '-') if isinstance(log, dict) else str(log)
-                status = str(log.get('status', '-')) if isinstance(log, dict) else "-"
+                method = log.get('method', '-')
+                endpoint = log.get('endpoint', '-')
+                status = str(log.get('status', '-'))
                 
-                # Potong Endpoint Panjang
-                if len(endpoint) > 35: endpoint = "..." + endpoint[-32:]
+                # Potong endpoint super panjang
+                if len(endpoint) > 60: endpoint = "..." + endpoint[-55:]
 
-                row = api_table.add_row().cells
-                self._fill_cell(row[0], method, size=7)
-                self._fill_cell(row[1], endpoint, size=7, font='Consolas')
+                row = table.add_row().cells
+                self._style_cell(row[0], method, size=8)
+                self._style_cell(row[1], endpoint, size=8, font='Consolas')
                 
-                # Status Icon
                 icon = "✅" if status.startswith('2') else "❌"
-                if status == '-': icon = "⏳"
-                self._fill_cell(row[2], f"{icon}{status}", size=7, bold=True)
+                if status == '-': icon = "⏳" # Loading icon
+                
+                self._style_cell(row[2], f"{icon} {status}", size=8, bold=True)
 
-        # --- SEL KANAN: GAMBAR ---
-        right_cell = grid.cell(0, 1)
-        right_cell.vertical_alignment = WD_ALIGN_VERTICAL.TOP
-        
-        if screenshot_path and os.path.exists(screenshot_path):
-            p_img = right_cell.paragraphs[0]
-            p_img.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            run_img = p_img.add_run()
-            # Lebar gambar dimaksimalkan sesuai kolom kanan (2.7 inch)
-            # Ini membuat screenshot terlihat besar dan jelas
-            run_img.add_picture(screenshot_path, width=Inches(2.5))
-
-        # 3. PAGE BREAK (Kunci 1 Halaman)
+        # 6. PAGE BREAK (KUNCI RAPIH)
+        # Ganti halaman setiap selesai satu langkah.
         self.document.add_page_break()
 
-    def _fill_cell(self, cell, text, bg=None, bold=False, size=8, font='Arial'):
-        """Helper canggih untuk styling sel tabel"""
+    def _style_cell(self, cell, text, bold=False, size=9, font='Arial', bg=None):
         cell.text = ""
         p = cell.paragraphs[0]
         run = p.add_run(text)
@@ -146,7 +125,6 @@ class SagaWriter:
         run.font.size = Pt(size)
         run.font.name = font
         
-        # Set Background Color (XML Hack)
         if bg:
             tc_pr = cell._element.get_or_add_tcPr()
             shd = OxmlElement('w:shd')
