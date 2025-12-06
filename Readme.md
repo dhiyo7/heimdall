@@ -154,6 +154,31 @@ TEKAN TOMBOL SISTEM "Back"
 | **Pastikan** | Pastikan muncul teks "Success" | Validasi (Assertion). Jika teks tidak muncul, test dianggap **GAGAL**. |
 | **Gulir** | Gulir ke "Bawah" | Scroll manual (Engine sudah punya *Smart Scroll*, tapi ini untuk memaksa). |
 
+
+## **⚠️ Troubleshooting & Tips (Wajib Baca!)**
+1. **Masalah Emulator: Keyboard Hilang?**
+Heimdall menggunakan "Ghost Keyboard" (FastInputIME) untuk mencegah error looping fokus pada Emulator.
+
+- **Efek Samping:** Saat script berjalan (atau setelah script stop mendadak/crash), Keyboard HP mungkin **TIDAK MUNCUL** saat kalian mau ngetik manual.
+
+- **Solusi:** Tools ini sudah dilengkapi fitur Auto-Restore. Namun jika keyboard kalian hilang permanen:
+
+   1. Jalankan script dummy sekali lagi sampai selesai (driver akan merestore keyboard di akhir sesi), ATAU
+
+   2. Matikan FastInputIME manual lewat terminal:
+
+```bash
+adb shell settings put secure default_input_method com.android.inputmethod.latin/.LatinIME
+```
+
+2. Tips Tombol Tanpa ID (VirtualFAB)
+- Jika ketemu tombol Tambah (+) yang melayang dan tidak punya ID:
+Cukup tulis: Ketuk tombol "FAB".
+
+- Driver otomatis menembak koordinat (X=85%, Y=80%) layar (di atas Bottom Bar).
+
+
+
 ## **▶️ Cara Eksekusi**
 
 Buka terminal di folder project, lalu jalankan perintah:
