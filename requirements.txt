@@ -1,3 +1,8 @@
 uiautomator2
-python-docx
 graphviz
+python-docx
+requests
+streamlit
+pandas
+altair
+Pillow
