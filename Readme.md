@@ -151,7 +151,8 @@ TEKAN TOMBOL SISTEM "Back"
 | **Ketuk** | Ketuk tombol "Masuk" | Klik tombol/teks bernama "Masuk". |
 | **Ketuk (FAB)** | Ketuk tombol "FAB" | **BARU\!** Khusus klik tombol melayang (+) di pojok kanan bawah. Menggunakan koordinat pintar. |
 | **Tunggu** | Tunggu sampai muncul teks "Home" | Menunggu (loading) sampai teks tertentu muncul. |
-| **Pastikan** | Pastikan muncul teks "Success" | Validasi (Assertion). Jika teks tidak muncul, test dianggap **GAGAL**. |
+| **Pastikan** | Pastikan muncul teks "Success" | **Soft Assert**: Cek teks. Jika tidak ada, catat Error tapi **LANJUT** ke langkah berikutnya. |
+| **Wajib** | Wajib muncul teks "Login" | **Hard Assert**: Cek teks. Jika tidak ada, script **BERHENTI TOTAL** (Critical Error). |
 | **Gulir** | Gulir ke "Bawah" | Scroll manual (Engine sudah punya *Smart Scroll*, tapi ini untuk memaksa). |
 
 
