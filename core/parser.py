@@ -4,7 +4,7 @@ import ast
 
 class HeimdallParser:
     """
-    Parser Terlengkap (V6.1 - Bugfix Case Sensitivity).
+    Parser Terlengkap (V7.0 - Support Soft/Hard Assertions).
     """
     def __init__(self, driver):
         self.driver = driver
@@ -48,9 +48,8 @@ class HeimdallParser:
             return
 
         # ==========================================
-        # 2. FITUR CONDITIONAL (JIKA) - [FIXED]
+        # 2. FITUR CONDITIONAL (JIKA)
         # ==========================================
-        # Kita ubah pengecekan menjadi HURUF BESAR SEMUA agar cocok
         if line.upper().startswith("JIKA MUNCUL TEKS"):
             match = re.search(r'JIKA muncul teks "(.*?)"', line, re.IGNORECASE)
             if match:
@@ -73,9 +72,10 @@ class HeimdallParser:
         if state['in_if']:
             state['if_buf'].append(line)
             return
-        # ==========================================
 
+        # ==========================================
         # 3. FITUR LOOPING (ULANGI)
+        # ==========================================
         if line.upper().startswith("ULANGI"):
             try:
                 match = re.search(r'ULANGI\s+"(.*?)"\s+DARI\s+(\[.*\])', line, re.IGNORECASE)
@@ -127,13 +127,29 @@ class HeimdallParser:
             if len(parts) >= 2:
                 yield {"type": "action", "cmd": "press_key", "args": [parts[1]], "desc": line, "feature": current_feature}
             return
-        # C. STANDARD
+        
+        # C. STANDARD ACTIONS
         parts = line.split('"')
         if len(parts) < 2: return
-        if line.startswith('Buka aplikasi'): yield {"type": "action", "cmd": "open_app", "args": [parts[1]], "desc": line, "feature": current_feature}
+        
+        if line.startswith('Buka aplikasi'): 
+            yield {"type": "action", "cmd": "open_app", "args": [parts[1]], "desc": line, "feature": current_feature}
         elif line.startswith('Ketik'): 
             if len(parts) >= 4: yield {"type": "action", "cmd": "input_text", "args": [parts[1], parts[3]], "desc": line, "feature": current_feature}
-        elif line.startswith('Ketuk tombol'): yield {"type": "action", "cmd": "click", "args": [parts[1]], "desc": line, "feature": current_feature}
-        elif line.startswith('Tunggu sampai muncul'): yield {"type": "action", "cmd": "wait", "args": [parts[1]], "desc": line, "feature": current_feature}
-        elif line.startswith('Pastikan muncul'): yield {"type": "action", "cmd": "assert", "args": [parts[1]], "desc": line, "feature": current_feature}
-        elif line.startswith('Gulir ke'): yield {"type": "action", "cmd": "scroll", "args": [parts[1]], "desc": line, "feature": current_feature}
+        elif line.startswith('Ketuk tombol'): 
+            yield {"type": "action", "cmd": "click", "args": [parts[1]], "desc": line, "feature": current_feature}
+        elif line.startswith('Tunggu sampai muncul'): 
+            yield {"type": "action", "cmd": "wait", "args": [parts[1]], "desc": line, "feature": current_feature}
+        elif line.startswith('Gulir ke'): 
+            yield {"type": "action", "cmd": "scroll", "args": [parts[1]], "desc": line, "feature": current_feature}
+
+        # --- [UPDATE] DYNAMIC ASSERTION ---
+        # 1. SOFT ASSERTION (Lanjut)
+        # Menangkap "Pastikan" atau "PASTIKAN"
+        elif line.upper().startswith('PASTIKAN MUNCUL'): 
+            yield {"type": "action", "cmd": "assert_soft", "args": [parts[1]], "desc": line, "feature": current_feature}
+        
+        # 2. HARD ASSERTION (Stop)
+        # Menangkap "WAJIB" atau "KRUSIAL"
+        elif line.upper().startswith('WAJIB MUNCUL') or line.upper().startswith('KRUSIAL MUNCUL'):
+            yield {"type": "action", "cmd": "assert_hard", "args": [parts[1]], "desc": line, "feature": current_feature}

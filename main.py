@@ -1,6 +1,7 @@
 import argparse
 import os
 import time
+import sys  # Wajib untuk sys.stdout
 from core.driver import HeimdallDriver
 from core.parser import HeimdallParser
 from core.vision_log import LogSniffer
@@ -11,18 +12,15 @@ from reporters.saga_writer import SagaWriter
 
 # Global Context
 ctx = {
-    "driver": None,
-    "parser": None,
-    "state": None,
-    "mapper": None,
-    "saga": None,
-    "sniffer": None,
-    "ss_dir": "",
-    "step_count": 0,
-    "activity": "Start"
+    "driver": None, "parser": None, "state": None,
+    "mapper": None, "saga": None, "sniffer": None,
+    "ss_dir": "", "step_count": 0, "activity": "Start"
 }
 
 def main():
+    # [FIX 1] Real-time Logging (Anti-Macet di Linux/Streamlit)
+    sys.stdout.reconfigure(line_buffering=True)
+    
     parser = argparse.ArgumentParser()
     parser.add_argument("file", help="Path to .heim file")
     args = parser.parse_args()
@@ -45,11 +43,10 @@ def main():
     try:
         for step in ctx["parser"].parse_file(args.file):
             process_step(step)
-            
         ctx["mapper"].add_step("Selesai", "end")
-
     except Exception as e:
-        print(f"!!! Critical System Failure: {e}")
+        print(f"⛔ CRITICAL STOP: {e}")
+        ctx["mapper"].add_step("STOP (Critical Error)", step_type="error")
     finally:
         ctx["sniffer"].stop()
         ctx["saga"].save()
@@ -58,37 +55,31 @@ def main():
         print("=== HEIMDALL SESSION ENDED ===")
 
 def process_step(step):
-    # A. Feature Grouping
     if step.get('type') == 'feature':
         print(f"\n--- [Feature: {step['name']}] ---")
         ctx["mapper"].set_feature(step['name'])
         return
 
-    # B. Conditional Logic
     if step.get('type') == 'conditional':
         raw_cond = step['condition']
         target = ctx["state"].resolve_text(raw_cond)
         
         ctx["mapper"].add_step(f"Muncul '{target}'?", step_type="logic")
         print(f"  ❓ [Logic] Mengecek kondisi: '{target}'...")
-        
         is_visible = False
         try:
-            ctx["driver"].d(textContains=target).wait(timeout=2.0)
             if ctx["driver"].d(textContains=target).exists: is_visible = True
         except: pass
 
         if is_visible:
-            print(f"  ✅ [Logic] TRUE. Masuk blok JIKA.")
+            print(f"  ✅ [Logic] TRUE.")
             for sub_step in ctx["parser"].parse_lines(step['body'], "Conditional Block"):
                 process_step(sub_step)
         else:
-            print(f"  ⏩ [Logic] FALSE. Skip.")
+            print(f"  ⏩ [Logic] FALSE.")
         return
 
-    # C. Standard Action
     ctx["step_count"] += 1
-    
     resolved_args = []
     if 'args' in step:
         for arg in step['args']:
@@ -105,15 +96,21 @@ def process_step(step):
         driver = ctx["driver"]
         
         # --- EKSEKUSI ---
-        if cmd == "open_app": driver.d.app_start(resolved_args[0])
-        elif cmd == "input_text": driver.input_text_on_field(resolved_args[0], resolved_args[1])
+        if cmd == "open_app": 
+            driver.d.app_start(resolved_args[0])
+        elif cmd == "input_text": 
+            driver.input_text_on_field(resolved_args[0], resolved_args[1])
         elif cmd == "click":
-            if str(resolved_args[0]).upper() == "FAB": driver.find_element_robust("FAB").click()
-            else: driver.find_element_robust(resolved_args[0]).click()
-        elif cmd == "wait": driver.find_element_robust(resolved_args[0])
-        elif cmd == "assert": 
-            if not driver.find_element_robust(resolved_args[0]).exists: raise Exception("Assert Failed")
-        elif cmd == "scroll": driver.scroll_down_coordinate()
+            # [FIX 2] Gunakan tap_element (Shell Click untuk Xiaomi/Emulator)
+            if str(resolved_args[0]).upper() == "FAB": 
+                driver.find_element_robust("FAB").click()
+            else: 
+                driver.tap_element(resolved_args[0])
+                
+        elif cmd == "wait": 
+            driver.find_element_robust(resolved_args[0])
+        elif cmd == "scroll": 
+            driver.scroll_down_coordinate()
         elif cmd == "save_text":
             text = driver.get_text_from_element(resolved_args[0])
             ctx["state"].set_variable(resolved_args[1], text)
@@ -123,6 +120,22 @@ def process_step(step):
             elif key == "home": driver.d.press("home")
             elif key == "enter": driver.d.press("enter")
             else: driver.d.press(key)
+
+        # --- [FIX 3] DYNAMIC ASSERTION LOGIC ---
+        
+        # A. SOFT ASSERTION (Keyword: PASTIKAN) -> Lanjut
+        elif cmd == "assert" or cmd == "assert_soft": 
+            if not driver.d(textContains=resolved_args[0]).exists and \
+               not driver.d(resourceId=resolved_args[0]).exists:
+                 # Raise biasa akan ditangkap sebagai Soft Fail
+                 raise Exception(f"Check Failed: '{resolved_args[0]}' tidak ditemukan")
+        
+        # B. HARD ASSERTION (Keyword: WAJIB) -> STOP
+        elif cmd == "assert_hard":
+             if not driver.d(textContains=resolved_args[0]).exists and \
+               not driver.d(resourceId=resolved_args[0]).exists:
+                 # Raise RuntimeError Khusus untuk mematikan program
+                 raise RuntimeError(f"CRITICAL CHECK FAILED: '{resolved_args[0]}' WAJIB ADA!")
 
         # --- SUKSES ---
         time.sleep(1.5)
@@ -137,25 +150,25 @@ def process_step(step):
         ctx["mapper"].add_step(narrative, step_type="action")
 
     except Exception as e:
-        # --- [MODIFIKASI: SOFT FAILURE] ---
-        # Jangan raise e (jangan matikan program)
-        # Cukup catat error dan lanjut
-        print(f"!!! ERROR (Soft Fail): {e}")
+        # [FIX 3] ERROR HANDLING
         
-        # Ambil Screenshot Error
+        # Jika Hard Assert (Critical), Lempar ke atas agar program MATI
+        if isinstance(e, RuntimeError) and "CRITICAL" in str(e):
+            err_path = os.path.join(ctx["ss_dir"], f"FATAL_ERROR_{ctx['step_count']}.png")
+            ctx["driver"].take_screenshot(err_path)
+            ctx["saga"].add_step(ctx["step_count"], f"[FATAL] {narrative}", ctx["activity"], err_path, [{"status": "FATAL", "msg": str(e)}])
+            ctx["mapper"].add_step("FATAL STOP", step_type="danger")
+            raise e 
+            
+        # Jika Soft Assert / Error Biasa, LANJUT
+        print(f"⚠️ SOFT FAIL: {e}")
         err_path = os.path.join(ctx["ss_dir"], f"error_step_{ctx['step_count']}.png")
         ctx["driver"].take_screenshot(err_path)
         
-        # Catat di Report sebagai Error tapi Lanjut
-        # Kita beri tanda [FAILED] di narasi agar user tau
         fail_narrative = f"[FAILED] {narrative}"
         ctx["saga"].add_step(ctx["step_count"], fail_narrative, ctx["activity"], err_path, [{"status": "ERROR", "msg": str(e)}])
-        
-        # Catat di Diagram sebagai Merah
         ctx["mapper"].add_step(narrative, step_type="error")
-        
-        # PENTING: Jangan 'raise e' disini agar loop for di atas tetap lanjut
-        pass 
+        pass # Lanjut ke step berikutnya
 
 if __name__ == "__main__":
     main()

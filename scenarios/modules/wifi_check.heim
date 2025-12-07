@@ -1,0 +1,17 @@
+# MODUL: CEK WIFI & SIMPAN DATA
+# Menguji Logic JIKA dan MEMORI
+
+Ketuk tombol "Network & internet"
+
+# --- CONDITIONAL LOGIC ---
+# Cek apakah Airplane Mode muncul? (Harusnya muncul di Pixel)
+JIKA muncul teks "Airplane mode"
+    # --- GLOBAL MEMORY ---
+    # Kita simpan teks "Airplane mode" ke variabel {FiturSafety}
+    # Nanti variabel ini kita panggil di file Master
+    SIMPAN teks dari "Airplane mode" KE "{FiturSafety}"
+AKHIR JIKA
+
+# Kembali ke menu utama
+TEKAN TOMBOL SISTEM "Back"
+Tunggu sampai muncul teks "Network & internet"

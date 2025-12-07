@@ -1,0 +1,9 @@
+# Test Buka Settings
+Buka aplikasi "com.android.settings"
+
+# Sekarang baru cari
+Tunggu sampai muncul teks "Settings"
+Ketuk tombol "Battery"
+
+# Validasi di dalam menu Baterai
+Pastikan muncul teks "Hemat daya"

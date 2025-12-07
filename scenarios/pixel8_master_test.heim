@@ -1,0 +1,53 @@
+# ============================================================
+# SKENARIO: PIXEL 8 FULL SYSTEM CHECK
+# DEVICE: Google Pixel 8 (Android 14)
+# FITUR: Modular + Loop + Memory + Conditional + System Keys
+# ============================================================
+
+# 1. MODULAR: Panggil file setup dulu
+JALANKAN "scenarios/modules/setup.heim"
+
+# 2. MODULAR: Panggil file cek wifi (Dia akan menyimpan variabel {FiturSafety})
+JALANKAN "scenarios/modules/wifi_check.heim"
+
+# ------------------------------------------------------------
+# FITUR: Quick Menu Audit (LOOPING)
+# ------------------------------------------------------------
+# Kita akan cek 3 menu utama di Pixel 8 secara otomatis
+# Pastikan nama menu sesuai bahasa HP (Inggris)
+
+ULANGI "MenuPixel" DARI ["Connected devices", "Display", "Apps"]
+    
+    # Masuk Menu
+    Ketuk tombol "{MenuPixel}"
+    
+    # Simulasi user melihat-lihat (Scroll)
+    Gulir ke "Bawah"
+    
+    # SYSTEM KEY: Navigasi Mundur
+    TEKAN TOMBOL SISTEM "Back"
+    
+    # Validasi kembali ke Home Settings sebelum loop lanjut
+    # Trik: Tunggu sampai judul "Settings" atau menu "Network" muncul lagi
+    Tunggu sampai muncul teks "Network & internet"
+
+SELESAI ULANGI
+
+# ------------------------------------------------------------
+# FITUR: Search & Memory Validation
+# ------------------------------------------------------------
+# Di sini kita buktikan bahwa variabel {FiturSafety} dari file 'wifi_check.heim'
+# masih tersimpan dan bisa dipanggil di file ini (Global Memory).
+
+# Scroll ke atas dulu (cari tombol search/avatar)
+# Di Pixel 8, Search Bar ada di paling atas.
+Ketuk tombol "Search settings"
+
+# Ketik isi memori ("Airplane mode")
+Ketik "{FiturSafety}" pada kolom "urutan 1"
+
+# Validasi Hasil
+Pastikan muncul teks "{FiturSafety}"
+
+# Selesai, kembali ke Home
+TEKAN TOMBOL SISTEM "Back"

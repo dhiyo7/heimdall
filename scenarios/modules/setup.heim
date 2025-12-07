@@ -1,0 +1,10 @@
+# MODUL: SETUP AWAL
+# Tujuannya biar setiap tes mulai dari kondisi bersih
+
+Buka aplikasi "com.android.settings"
+Tunggu sampai muncul teks "Search settings"
+
+# Pastikan kita di paling atas (Scroll Up sedikit)
+# Karena driver kita baru punya scroll down, kita pakai trik:
+# Klik title "Settings" untuk memastikan fokus (opsional)
+Pastikan muncul teks "Network & internet"

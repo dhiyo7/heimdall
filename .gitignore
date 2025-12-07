@@ -1,4 +1,43 @@
-*.heim
-scenarios/
+# --- 1. PYTHON BOILERPLATE ---
+__pycache__/
+*.py[cod]
+*$py.class
+
+# --- 2. ENVIRONMENT (VENV) ---
+# Folder environment python lokal (jika ada)
+env/
+venv/
+.venv/
+
+# --- 3. PYINSTALLER ARTIFACTS (PENTING!) ---
+# Folder hasil build yang ukurannya besar & binary
+build/
+dist/
+# Spec file boleh di-commit agar tim tau cara buildnya, 
+# TAPI kalau isinya path laptop pribadi (D:/User/...), ignore aja.
+# *.spec 
+
+# --- 4. HEIMDALL RUNTIME & REPORTS ---
+# Folder laporan hasil tes
 reports/
-CONTEXT.md
+
+# Folder screenshot error sementara (jika ada di root)
+*.png
+*.log
+
+# --- 5. SCENARIOS (PILIHAN) ---
+# Mas mau ignore semua .heim?
+# Saran: Ignore folder-nya, TAPI sisakan 1 file demo biar orang tau contohnya.
+scenarios/*
+!scenarios/demo.heim
+!scenarios/pixel8_master_test.heim
+!scenarios/modules/
+
+# --- 6. OS & IDE JUNK ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# --- 7. STREAMLIT ---
+.streamlit/
