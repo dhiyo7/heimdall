@@ -310,6 +310,11 @@ Setelah test selesai, cek folder reports/nama\_test\_kalian/. Kalian akan mendap
 
 *Fokus: Skalabilitas dan Distribusi Tim Besar.*
 
+- [ ] **Heimdall Studio (In-App Editor)**
+    - Membuat, mengedit, dan menyimpan file `.heim` langsung di dalam aplikasi.
+    - Tampilan Code Editor dengan syntax highlighting.
+    - File Tree Explorer untuk manajemen folder skenario.
+
 - [ ] **Automated Build System (GitHub Actions)**
     - Setup CI/CD pipeline.
     - Setiap push code -> Otomatis build installer untuk Windows, Mac, dan Linux.

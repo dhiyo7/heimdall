@@ -41,3 +41,6 @@ Thumbs.db
 
 # --- 7. STREAMLIT ---
 .streamlit/
+
+CONTEXT.md
+Heimdall_Platform.spec
